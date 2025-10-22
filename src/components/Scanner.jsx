@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import { api } from "../api/supabaseApi";
 
-const API_URL = "https://api.platerecognizer.com/v1/plate-reader/";
+const API_URL = "/api/plate-proxy";
 const API_TOKEN = "Token 1fae05d784489623e8fa71674e4c4c261850f184";
 
 export default function Scanner() {

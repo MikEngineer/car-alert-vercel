@@ -1,34 +1,84 @@
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY;
-
-export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+// Inizializza client Supabase
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_KEY;
+export const supabase = createClient(supabaseUrl, supabaseKey);
 
 export const api = {
-  // === AUTENTICAZIONE ===
+  // 🔹 Registrazione nuovo utente
   async register(email, password) {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
-    return data.user;
+    return data;
   },
 
+  // 🔹 Login utente
   async login(email, password) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
     if (error) throw error;
-    return data.user;
+    return data;
   },
 
+  // 🔹 Logout utente
   async logout() {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
   },
 
-  async getCurrentUser() {
-    const { data } = await supabase.auth.getUser();
-    return data?.user || null;
+  // 🔹 Recupera utente attuale
+  async currentUser() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    return user;
   },
 
-  // === REPORTS ===
+  // 🔹 Inserisce nuovo report (annuncio)
+  async createReport(data) {
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      console.error("Utente non loggato:", userError?.message);
+      throw new Error("Devi essere loggato per creare un annuncio");
+    }
+
+    const { error } = await supabase.from("reports").insert([
+      {
+        title: data.title,
+        plate: data.plate,
+        description: data.description,
+        reporter_id: user.id, // collegamento FK
+      },
+    ]);
+
+    if (error) {
+      console.error("Errore insert report:", error.message);
+      throw error;
+    }
+  },
+
+  // 🔹 Cerca targa
+  async searchPlate(plate) {
+    const { data, error } = await supabase
+      .from("reports")
+      .select("*")
+      .ilike("plate", `%${plate}%`);
+
+    if (error) {
+      console.error("Errore searchPlate:", error.message);
+      return [];
+    }
+    return data || [];
+  },
+
+  // 🔹 Elenco report
   async getReports() {
     const { data, error } = await supabase
       .from("reports")
@@ -37,51 +87,4 @@ export const api = {
     if (error) throw error;
     return data;
   },
-
-  async addReport({ plate, make, model, color, notes }) {
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData?.user;
-    if (!user) throw new Error("Utente non autenticato.");
-
-    const { data, error } = await supabase
-      .from("reports")
-      .insert([{ plate, make, model, color, notes, reporter_id: user.id }])
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  },
-
-  async deleteReport(id) {
-    const { error } = await supabase.from("reports").delete().eq("id", id);
-    if (error) throw error;
-  },
-
-  async verifyReport(id) {
-    const { error } = await supabase.from("reports").update({ verified: true }).eq("id", id);
-    if (error) throw error;
-  },
-
-  async getUserReports(userId) {
-    const { data, error } = await supabase
-      .from("reports")
-      .select("*")
-      .eq("reporter_id", userId)
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    return data;
-  },
-
-    async searchPlate(plate) {
-    // ricerca case-insensitive per targa
-    const { data, error } = await supabase
-      .from("reports")
-      .select("*")
-      .ilike("plate", `%${plate}%`);
-
-    if (error) throw error;
-    return data;
-  },
-
 };

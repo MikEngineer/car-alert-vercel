@@ -12,7 +12,9 @@ export default function Scanner() {
   useEffect(() => {
     const startCamera = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 1280, height: 720 },
+        });
         videoRef.current.srcObject = stream;
       } catch (err) {
         console.error("Errore apertura fotocamera:", err);
@@ -25,16 +27,16 @@ export default function Scanner() {
       if (paused || loading) return;
       setLoading(true);
 
-      const canvas = canvasRef.current;
       const video = videoRef.current;
-      if (!canvas || !video) return;
+      const canvas = canvasRef.current;
+      if (!video || !canvas) return;
 
       const ctx = canvas.getContext("2d");
+      // Disegna con risoluzione più alta per evitare base64 vuote
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      // Converti immagine in base64 per il proxy
-      const canvasData = canvas.toDataURL("image/jpeg");
-      const base64Image = canvasData.split(",")[1];
+      // JPEG di qualità alta per Plate Recognizer
+      const base64Image = canvas.toDataURL("image/jpeg", 0.9).split(",")[1];
 
       try {
         const res = await axios.post("/api/plate-proxy", { image: base64Image });
@@ -48,7 +50,6 @@ export default function Scanner() {
             setDetected(`⚠️ Targa segnalata: ${matches[0].plate}`);
             setPaused(true);
 
-            // Avviso sonoro
             const audio = new Audio("/alert.mp3");
             audio.play().catch(() => {});
           } else {
@@ -59,11 +60,11 @@ export default function Scanner() {
         }
       } catch (err) {
         console.error("Errore riconoscimento:", err);
-        setDetected("⚠️ Errore nel riconoscimento");
+        setDetected("⚠️ Nessuna targa rilevata o immagine non valida");
       } finally {
         setLoading(false);
       }
-    }, 4000);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [paused, loading]);
@@ -74,31 +75,25 @@ export default function Scanner() {
 
       <div className="ratio ratio-16x9 border rounded overflow-hidden shadow-sm mb-3">
         <video ref={videoRef} autoPlay muted playsInline />
-        <canvas ref={canvasRef} width={640} height={360} hidden />
+        <canvas ref={canvasRef} width={1280} height={720} hidden />
       </div>
 
-      {/* Avviso visivo */}
       {detected && (
         <div
           className={`alert ${
-            detected.includes("⚠️")
-              ? "alert-danger"
-              : "alert-success"
+            detected.includes("⚠️") ? "alert-danger" : "alert-success"
           } mt-3`}
-          role="alert"
         >
           {detected}
         </div>
       )}
 
-      {/* Stato caricamento */}
       {loading && (
         <div className="spinner-border text-primary mt-3" role="status">
           <span className="visually-hidden">Analisi in corso...</span>
         </div>
       )}
 
-      {/* Pulsante controllo scansione */}
       <div className="mt-4">
         <button
           className={`btn ${paused ? "btn-success" : "btn-warning"} px-4`}

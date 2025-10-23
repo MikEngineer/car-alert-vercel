@@ -1,12 +1,12 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../context/useAuth";
+import { useAuth } from "../context/AuthContext"; // ← diretto, non da useAuth.js
 
 export default function Navbar() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    localStorage.removeItem("supabase.auth.token");
+  const handleLogout = async () => {
+    await localStorage.removeItem("supabase.auth.token");
     navigate("/login");
     window.location.reload();
   };
@@ -16,7 +16,6 @@ export default function Navbar() {
       <div className="container-fluid">
         <Link className="navbar-brand fw-bold" to="/">Car Alert</Link>
 
-        {/* Pulsante toggle per mobile */}
         <button
           className="navbar-toggler"
           type="button"
@@ -29,32 +28,19 @@ export default function Navbar() {
           <span className="navbar-toggler-icon"></span>
         </button>
 
-        {/* Contenuto della navbar */}
         <div className="collapse navbar-collapse" id="navbarNav">
           <ul className="navbar-nav ms-auto align-items-center">
-            <li className="nav-item">
-              <Link className="nav-link" to="/">Home</Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link" to="/annunci">Annunci</Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link" to="/scanner">Scanner</Link>
-            </li>
+            <li className="nav-item"><Link className="nav-link" to="/">Home</Link></li>
+            <li className="nav-item"><Link className="nav-link" to="/annunci">Annunci</Link></li>
+            <li className="nav-item"><Link className="nav-link" to="/scanner">Scanner</Link></li>
 
-            {user && (
+            {user ? (
               <>
-                <li className="nav-item">
-                  <Link className="nav-link" to="/new">Nuovo Annuncio</Link>
-                </li>
-                <li className="nav-item">
-                  <Link className="nav-link" to="/profile">Profilo</Link>
-                </li>
+                <li className="nav-item"><Link className="nav-link" to="/new">Nuovo Annuncio</Link></li>
+                <li className="nav-item"><Link className="nav-link" to="/profile">Profilo</Link></li>
                 {user.email === "admin@caralert.it" && (
                   <li className="nav-item">
-                    <Link className="nav-link text-warning" to="/admin">
-                      Admin Panel
-                    </Link>
+                    <Link className="nav-link text-warning" to="/admin">Admin Panel</Link>
                   </li>
                 )}
                 <li className="nav-item">
@@ -66,16 +52,10 @@ export default function Navbar() {
                   </button>
                 </li>
               </>
-            )}
-
-            {!user && (
+            ) : (
               <>
-                <li className="nav-item">
-                  <Link className="nav-link" to="/login">Login</Link>
-                </li>
-                <li className="nav-item">
-                  <Link className="nav-link" to="/register">Registrati</Link>
-                </li>
+                <li className="nav-item"><Link className="nav-link" to="/login">Login</Link></li>
+                <li className="nav-item"><Link className="nav-link" to="/register">Registrati</Link></li>
               </>
             )}
           </ul>

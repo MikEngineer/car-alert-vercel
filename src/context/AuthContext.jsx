@@ -1,20 +1,20 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "../api/supabaseApi";
 
-const AuthContext = createContext();
+const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadUser = async () => {
-      const { data } = await supabase.auth.getSession();
+    // Recupera sessione iniziale
+    supabase.auth.getSession().then(({ data }) => {
       setUser(data?.session?.user ?? null);
       setLoading(false);
-    };
-    loadUser();
+    });
 
+    // Ascolta login, logout e refresh token
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {

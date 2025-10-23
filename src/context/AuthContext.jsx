@@ -8,13 +8,11 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Recupera sessione iniziale
     supabase.auth.getSession().then(({ data }) => {
       setUser(data?.session?.user ?? null);
       setLoading(false);
     });
 
-    // Ascolta login, logout e refresh token
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {

@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { supabase } from "../api/supabaseApi";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 export default function NewReport() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [form, setForm] = useState({
     plate: "",
     brand: "",
@@ -50,6 +52,7 @@ export default function NewReport() {
           color: form.color,
           description: form.description,
           image_url: imageUrl,
+          reporter_id: user?.id || null,
         },
       ]);
 

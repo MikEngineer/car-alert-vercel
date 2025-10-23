@@ -15,7 +15,7 @@ export default function App() {
       <Navbar />
       <Routes>
         <Route path="/" element={<Dashboard />} />
-        <Route path="/reports" element={<Reports />} />
+        <Route path="/annunci" element={<Reports />} />
         <Route path="/new" element={<NewReport />} />
         <Route path="/scanner" element={<Scanner />} />
         <Route path="/login" element={<Login />} />

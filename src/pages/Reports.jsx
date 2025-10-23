@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../api/supabaseApi";
 
 export default function Reports() {
   const [reports, setReports] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [brandFilter, setBrandFilter] = useState("");
+  const [modelFilter, setModelFilter] = useState("");
 
   useEffect(() => {
     const fetchReports = async () => {
@@ -28,6 +31,81 @@ export default function Reports() {
 
     fetchReports();
   }, []);
+
+  const brands = useMemo(() => {
+    const uniqueBrands = new Set();
+
+    reports.forEach((report) => {
+      if (report.brand) {
+        uniqueBrands.add(report.brand);
+      }
+    });
+
+    return Array.from(uniqueBrands).sort((a, b) =>
+      a.localeCompare(b, "it", { sensitivity: "base" })
+    );
+  }, [reports]);
+
+  const models = useMemo(() => {
+    const uniqueModels = new Set();
+
+    reports.forEach((report) => {
+      if (brandFilter && report.brand !== brandFilter) {
+        return;
+      }
+
+      if (report.model) {
+        uniqueModels.add(report.model);
+      }
+    });
+
+    return Array.from(uniqueModels).sort((a, b) =>
+      a.localeCompare(b, "it", { sensitivity: "base" })
+    );
+  }, [reports, brandFilter]);
+
+  useEffect(() => {
+    if (modelFilter && !models.includes(modelFilter)) {
+      setModelFilter("");
+    }
+  }, [modelFilter, models]);
+
+  const filteredReports = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return reports.filter((report) => {
+      if (brandFilter && report.brand !== brandFilter) {
+        return false;
+      }
+
+      if (modelFilter && report.model !== modelFilter) {
+        return false;
+      }
+
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      const haystack = [
+        report.plate,
+        report.brand,
+        report.model,
+        report.color,
+        report.description,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(normalizedSearch);
+    });
+  }, [reports, searchTerm, brandFilter, modelFilter]);
+
+  const handleBrandChange = (event) => {
+    const value = event.target.value;
+    setBrandFilter(value);
+    setModelFilter("");
+  };
 
   if (loading) {
     return (
@@ -59,64 +137,134 @@ export default function Reports() {
     <div className="container py-5">
       <h3 className="text-center mb-4">Annunci segnalati</h3>
 
-      <div className="row">
-        {reports.map((r) => (
-          <div key={r.id} className="col-md-4 mb-4">
-            <div className="card shadow-sm h-100">
-              {r.image_url ? (
-                <img
-                  src={r.image_url}
-                  className="card-img-top"
-                  alt="Veicolo segnalato"
-                  style={{ objectFit: "cover", height: "200px" }}
-                  onError={(e) => (e.target.style.display = "none")}
-                />
-              ) : (
-                <div
-                  className="bg-light d-flex align-items-center justify-content-center"
-                  style={{ height: "200px" }}
-                >
-                  <span className="text-muted">Nessuna immagine</span>
-                </div>
-              )}
+      <div className="card shadow-sm border-0 mb-4">
+        <div className="card-body">
+          <form
+            className="row g-3 align-items-end"
+            onSubmit={(event) => event.preventDefault()}
+          >
+            <div className="col-md-6">
+              <label htmlFor="reportSearch" className="form-label">
+                Cerca
+              </label>
+              <input
+                id="reportSearch"
+                type="search"
+                className="form-control"
+                placeholder="Targa, descrizione, colore..."
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+              />
+            </div>
 
-              <div className="card-body d-flex flex-column">
-                <h5 className="card-title">
-                  {r.plate ? r.plate.toUpperCase() : "Senza targa"}
-                </h5>
+            <div className="col-md-3">
+              <label htmlFor="brandFilter" className="form-label">
+                Marca
+              </label>
+              <select
+                id="brandFilter"
+                className="form-select"
+                value={brandFilter}
+                onChange={handleBrandChange}
+              >
+                <option value="">Tutte</option>
+                {brands.map((brand) => (
+                  <option key={brand} value={brand}>
+                    {brand}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-                {(r.brand || r.model || r.color) && (
-                  <ul className="list-unstyled small text-muted mb-3">
-                    {r.brand && (
-                      <li>
-                        <strong>Marca:</strong> {r.brand}
-                      </li>
-                    )}
-                    {r.model && (
-                      <li>
-                        <strong>Modello:</strong> {r.model}
-                      </li>
-                    )}
-                    {r.color && (
-                      <li>
-                        <strong>Colore:</strong> {r.color}
-                      </li>
-                    )}
-                  </ul>
+            <div className="col-md-3">
+              <label htmlFor="modelFilter" className="form-label">
+                Modello
+              </label>
+              <select
+                id="modelFilter"
+                className="form-select"
+                value={modelFilter}
+                onChange={(event) => setModelFilter(event.target.value)}
+                disabled={!models.length}
+              >
+                <option value="">Tutti</option>
+                {models.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      {filteredReports.length ? (
+        <div className="row">
+          {filteredReports.map((report) => (
+            <div key={report.id} className="col-md-4 mb-4">
+              <div className="card shadow-sm h-100">
+                {report.image_url ? (
+                  <img
+                    src={report.image_url}
+                    className="card-img-top"
+                    alt="Veicolo segnalato"
+                    style={{ objectFit: "cover", height: "200px" }}
+                    onError={(event) => (event.target.style.display = "none")}
+                  />
+                ) : (
+                  <div
+                    className="bg-light d-flex align-items-center justify-content-center"
+                    style={{ height: "200px" }}
+                  >
+                    <span className="text-muted">Nessuna immagine</span>
+                  </div>
                 )}
 
-                <p className="card-text mb-3">
-                  {r.description || "Nessuna descrizione"}
-                </p>
+                <div className="card-body d-flex flex-column">
+                  <h5 className="card-title">
+                    {report.plate ? report.plate.toUpperCase() : "Senza targa"}
+                  </h5>
 
-                <small className="text-muted mt-auto">
-                  {new Date(r.created_at).toLocaleString("it-IT")}
-                </small>
+                  {(report.brand || report.model || report.color) && (
+                    <ul className="list-unstyled small text-muted mb-3">
+                      {report.brand && (
+                        <li>
+                          <strong>Marca:</strong> {report.brand}
+                        </li>
+                      )}
+                      {report.model && (
+                        <li>
+                          <strong>Modello:</strong> {report.model}
+                        </li>
+                      )}
+                      {report.color && (
+                        <li>
+                          <strong>Colore:</strong> {report.color}
+                        </li>
+                      )}
+                    </ul>
+                  )}
+
+                  <p className="card-text mb-3">
+                    {report.description || "Nessuna descrizione"}
+                  </p>
+
+                  <small className="text-muted mt-auto">
+                    {new Date(report.created_at).toLocaleString("it-IT")}
+                  </small>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-5">
+          <p className="text-muted mb-0">
+            Nessun annuncio corrisponde ai filtri selezionati.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

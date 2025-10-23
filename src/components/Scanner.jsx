@@ -1,60 +1,74 @@
-import { useRef, useEffect, useState } from "react";
-import axios from "axios";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../api/supabaseApi";
+import axios from "axios";
 
 export default function Scanner() {
   const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const [scanning, setScanning] = useState(false);
-  const [plate, setPlate] = useState("");
-  const [alerted, setAlerted] = useState(false);
+  const [detected, setDetected] = useState("");
+  const [paused, setPaused] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [reports, setReports] = useState([]);
 
+  // Carica targhe segnalate dal DB
   useEffect(() => {
-    const startCamera = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" } },
-        });
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      } catch (err) {
-        console.error("Errore accesso fotocamera:", err);
-      }
+    const loadReports = async () => {
+      const { data, error } = await supabase.from("reports").select("plate");
+      if (!error && data) setReports(data.map((r) => r.plate.toUpperCase()));
     };
-    startCamera();
+    loadReports();
   }, []);
 
+  // Avvia fotocamera
+  useEffect(() => {
+    if (paused) return;
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: "environment" } }) // <-- usa fotocamera posteriore
+      .then((stream) => {
+        if (videoRef.current) videoRef.current.srcObject = stream;
+      })
+      .catch((err) => console.error("Errore fotocamera:", err));
+  }, [paused]);
+
+  // Analizza frame periodicamente
+  useEffect(() => {
+    if (paused) return;
+    const interval = setInterval(captureFrame, 4000);
+    return () => clearInterval(interval);
+  }, [paused, reports]);
+
   const captureFrame = async () => {
+    if (!videoRef.current || paused) return;
+
+    const canvas = document.createElement("canvas");
     const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas) return;
-
-    const width = video.videoWidth;
-    const height = video.videoHeight;
-    if (!width || !height) return;
-
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, width, height);
-    const image = canvas.toDataURL("image/jpeg");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    setLoading(true);
+    const image = canvas.toDataURL("image/jpeg").split(",")[1];
+
     try {
+      setLoading(true);
       const res = await axios.post("/api/plate-proxy", { image });
-      const results = res.data?.results;
-      if (results?.length > 0) {
-        const detectedPlate = results[0].plate.toUpperCase();
-        setPlate(detectedPlate);
+      const plate = res.data?.results?.[0]?.plate?.toUpperCase();
 
-        // controllo sul DB Supabase
-        const { data: reports } = await supabase
-          .from("reports")
-          .select("plate")
-          .eq("plate", detectedPlate);
+      if (plate) {
+        console.log("Targa riconosciuta:", plate);
 
-        setAlerted(reports && reports.length > 0);
+        if (reports.includes(plate)) {
+          // ⚠️ Blocco scanner
+          setDetected(`⚠️ Targa segnalata: ${plate}`);
+          setPaused(true);
+
+          // Allarme sonoro
+          const alertSound = new Audio("/alert.mp3");
+          alertSound.play().catch(() => {});
+        } else {
+          setDetected(`Targa rilevata: ${plate}`);
+        }
+      } else {
+        setDetected("");
       }
     } catch (err) {
       console.error("Errore riconoscimento:", err);
@@ -63,38 +77,35 @@ export default function Scanner() {
     }
   };
 
-  useEffect(() => {
-    let interval;
-    if (scanning) interval = setInterval(captureFrame, 1500);
-    return () => clearInterval(interval);
-  }, [scanning]);
+  const handleResume = () => {
+    setPaused(false);
+    setDetected("");
+  };
 
   return (
-    <div className="text-center py-4">
-      <video ref={videoRef} style={{ width: "100%", borderRadius: "8px" }} playsInline muted />
-      <canvas ref={canvasRef} style={{ display: "none" }} />
+    <div className="container text-center py-5">
+      <h2>Scanner Targhe</h2>
 
-      <div className="mt-3">
-        <button
-          className={`btn ${scanning ? "btn-danger" : "btn-warning"}`}
-          onClick={() => setScanning((s) => !s)}
-        >
-          {scanning ? "Ferma scanner" : "Avvia scanner"}
-        </button>
+      <div className="ratio ratio-4x3 bg-dark rounded overflow-hidden mt-3">
+        <video ref={videoRef} autoPlay playsInline muted />
       </div>
 
-      {loading && <p className="text-muted mt-3">Elaborazione in corso...</p>}
+      {loading && <p className="text-muted mt-3">Analisi in corso...</p>}
 
-      {plate && (
+      {detected && (
         <div
-          className={`alert mt-3 ${
-            alerted ? "alert-danger" : "alert-success"
-          }`}
+          className={`alert ${
+            detected.includes("⚠️") ? "alert-danger" : "alert-info"
+          } mt-3`}
         >
-          {alerted
-            ? `ATTENZIONE: La targa ${plate} risulta segnalata!`
-            : `Targa riconosciuta: ${plate}`}
+          {detected}
         </div>
+      )}
+
+      {paused && (
+        <button onClick={handleResume} className="btn btn-warning mt-2">
+          Riprendi scansione
+        </button>
       )}
     </div>
   );

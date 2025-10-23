@@ -1,11 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useEffect, useState } from "react";
 import axios from "axios";
-import { supabase } from "../api/supabaseApi";
 
-export default function Scanner() {
+export default function Scanner({ onResult }) {
   const videoRef = useRef(null);
-  const [detected, setDetected] = useState("");
-  const [paused, setPaused] = useState(false);
+  const canvasRef = useRef(null);
+  const [scanning, setScanning] = useState(false);
 
   useEffect(() => {
     const startCamera = async () => {
@@ -14,6 +13,7 @@ export default function Scanner() {
           video: { facingMode: "environment" },
         });
         videoRef.current.srcObject = stream;
+        videoRef.current.play();
       } catch (err) {
         console.error("Errore accesso fotocamera:", err);
       }
@@ -21,71 +21,57 @@ export default function Scanner() {
     startCamera();
   }, []);
 
-  useEffect(() => {
-    if (paused) return;
-    const interval = setInterval(async () => {
-      if (!videoRef.current) return;
+  const captureFrame = async () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
 
-      const canvas = document.createElement("canvas");
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-      const image = canvas.toDataURL("image/jpeg").split(",")[1];
+    const width = video.videoWidth;
+    const height = video.videoHeight;
+    if (!width || !height) return;
 
-      try {
-        const res = await axios.post("/api/plate-proxy", { image });
-        const plate = res.data?.results?.[0]?.plate?.toUpperCase();
+    canvas.width = width;
+    canvas.height = height;
 
-        if (plate) {
-          console.log("Targa riconosciuta:", plate);
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, width, height);
 
-          const { data: reports } = await supabase
-            .from("reports")
-            .select("*")
-            .ilike("plate", `%${plate}%`);
+    const image = canvas.toDataURL("image/jpeg");
 
-          if (reports.length > 0) {
-            setDetected(`⚠️ Targa segnalata: ${plate}`);
-            setPaused(true);
-            const audio = new Audio("/alert.mp3");
-            audio.play().catch(() => {});
-          } else {
-            setDetected(`Targa rilevata: ${plate}`);
-          }
-        }
-      } catch (err) {
-        console.error("Errore riconoscimento:", err);
+    try {
+      const response = await axios.post("/api/plate-proxy", { image });
+      if (response.data.results?.length > 0) {
+        const plate = response.data.results[0].plate;
+        onResult(plate);
       }
-    }, 4000);
+    } catch (error) {
+      console.error("Errore riconoscimento:", error);
+    }
+  };
 
+  useEffect(() => {
+    let interval;
+    if (scanning) {
+      interval = setInterval(captureFrame, 1500);
+    }
     return () => clearInterval(interval);
-  }, [paused]);
+  }, [scanning]);
 
   return (
-    <div className="container text-center mt-4">
-      <h3 className="mb-3">Scanner Targhe</h3>
+    <div className="text-center">
       <video
         ref={videoRef}
-        autoPlay
+        style={{ width: "100%", borderRadius: "8px" }}
         playsInline
-        className="w-100 rounded shadow"
+        muted
       />
-      <p
-        className={`mt-3 p-2 fw-bold rounded ${
-          detected.includes("⚠️") ? "bg-danger text-white" : "bg-light"
-        }`}
+      <canvas ref={canvasRef} style={{ display: "none" }} />
+      <button
+        className={`btn mt-3 ${scanning ? "btn-danger" : "btn-warning"}`}
+        onClick={() => setScanning((s) => !s)}
       >
-        {detected}
-      </p>
-      {paused && (
-        <button
-          className="btn btn-warning mt-2"
-          onClick={() => setPaused(false)}
-        >
-          Riprendi scansione
-        </button>
-      )}
+        {scanning ? "Ferma scanner" : "Avvia scanner"}
+      </button>
     </div>
   );
 }

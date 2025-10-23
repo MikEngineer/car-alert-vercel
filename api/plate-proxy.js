@@ -8,9 +8,12 @@ export default async function handler(req, res) {
 
   try {
     const { image } = req.body;
-    if (!image) return res.status(400).json({ error: "No image provided" });
+    if (!image) return res.status(400).json({ error: "No image data" });
 
-    const buffer = Buffer.from(image, "base64");
+    // Converte il base64 in buffer binario
+    const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
+    const buffer = Buffer.from(base64Data, "base64");
+
     const form = new FormData();
     form.append("upload", buffer, { filename: "frame.jpg" });
 
@@ -19,15 +22,17 @@ export default async function handler(req, res) {
       form,
       {
         headers: {
-          Authorization: `Token ${process.env.PLATE_RECOGNIZER_TOKEN}`,
+          Authorization: `Token ${process.env.VITE_PLATE_TOKEN}`,
           ...form.getHeaders(),
         },
       }
     );
 
-    res.status(200).json(response.data);
+    return res.status(200).json(response.data);
   } catch (error) {
-    console.error("Proxy error:", error.message);
-    res.status(400).json({ error: error.message });
+    console.error("Proxy error:", error.response?.data || error.message);
+    return res
+      .status(error.response?.status || 500)
+      .json({ error: error.response?.data || error.message });
   }
 }

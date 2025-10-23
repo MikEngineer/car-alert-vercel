@@ -11,7 +11,9 @@ export default function Reports() {
       try {
         const { data, error } = await supabase
           .from("reports")
-          .select("id, plate, description, image_url, created_at")
+          .select(
+            "id, plate, brand, model, color, description, image_url, created_at"
+          )
           .order("created_at", { ascending: false });
 
         if (error) throw error;
@@ -78,14 +80,36 @@ export default function Reports() {
                 </div>
               )}
 
-              <div className="card-body">
+              <div className="card-body d-flex flex-column">
                 <h5 className="card-title">
                   {r.plate ? r.plate.toUpperCase() : "Senza targa"}
                 </h5>
-                <p className="card-text">
+
+                {(r.brand || r.model || r.color) && (
+                  <ul className="list-unstyled small text-muted mb-3">
+                    {r.brand && (
+                      <li>
+                        <strong>Marca:</strong> {r.brand}
+                      </li>
+                    )}
+                    {r.model && (
+                      <li>
+                        <strong>Modello:</strong> {r.model}
+                      </li>
+                    )}
+                    {r.color && (
+                      <li>
+                        <strong>Colore:</strong> {r.color}
+                      </li>
+                    )}
+                  </ul>
+                )}
+
+                <p className="card-text mb-3">
                   {r.description || "Nessuna descrizione"}
                 </p>
-                <small className="text-muted">
+
+                <small className="text-muted mt-auto">
                   {new Date(r.created_at).toLocaleString("it-IT")}
                 </small>
               </div>

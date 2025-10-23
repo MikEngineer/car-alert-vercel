@@ -1,6 +1,11 @@
 import axios from "axios";
 import FormData from "form-data";
 
+// Forza Vercel a usare runtime Node, non Edge
+export const config = {
+  runtime: "nodejs",
+};
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -10,7 +15,8 @@ export default async function handler(req, res) {
     const { image } = req.body;
     if (!image) return res.status(400).json({ error: "No image data" });
 
-    // Converte il base64 in buffer binario
+    // Import dinamico per evitare warning nel bundle
+    const { Buffer } = await import("buffer");
     const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
 

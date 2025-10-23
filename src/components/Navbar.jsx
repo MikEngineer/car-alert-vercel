@@ -1,83 +1,84 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import { supabase } from "../api/supabaseApi";
+import { useAuth } from "../context/useAuth";
 
 export default function Navbar() {
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const { user, setUser } = useAuth();
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
+  const handleLogout = () => {
+    localStorage.removeItem("supabase.auth.token");
     navigate("/login");
+    window.location.reload();
   };
 
   return (
-    <nav className="navbar navbar-expand-lg navbar-dark bg-primary shadow">
+    <nav className="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm px-3">
       <div className="container-fluid">
-        <Link className="navbar-brand fw-bold text-white" to="/">
-          CarAlert
-        </Link>
+        <Link className="navbar-brand fw-bold" to="/">Car Alert</Link>
 
+        {/* Pulsante toggle per mobile */}
         <button
           className="navbar-toggler"
           type="button"
           data-bs-toggle="collapse"
           data-bs-target="#navbarNav"
+          aria-controls="navbarNav"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
         >
           <span className="navbar-toggler-icon"></span>
         </button>
 
+        {/* Contenuto della navbar */}
         <div className="collapse navbar-collapse" id="navbarNav">
-          <ul className="navbar-nav me-auto mb-2 mb-lg-0">
+          <ul className="navbar-nav ms-auto align-items-center">
             <li className="nav-item">
-              <Link className="nav-link text-white" to="/scanner">
-                Scanner
-              </Link>
+              <Link className="nav-link" to="/">Home</Link>
             </li>
             <li className="nav-item">
-              <Link className="nav-link text-white" to="/annunci">
-                Annunci
-              </Link>
+              <Link className="nav-link" to="/annunci">Annunci</Link>
             </li>
+            <li className="nav-item">
+              <Link className="nav-link" to="/scanner">Scanner</Link>
+            </li>
+
             {user && (
-              <li className="nav-item">
-                <Link className="nav-link text-white" to="/new">
-                  Nuovo Annuncio
-                </Link>
-              </li>
+              <>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/new">Nuovo Annuncio</Link>
+                </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/profile">Profilo</Link>
+                </li>
+                {user.email === "admin@caralert.it" && (
+                  <li className="nav-item">
+                    <Link className="nav-link text-warning" to="/admin">
+                      Admin Panel
+                    </Link>
+                  </li>
+                )}
+                <li className="nav-item">
+                  <button
+                    className="btn btn-outline-light btn-sm ms-2"
+                    onClick={handleLogout}
+                  >
+                    Logout
+                  </button>
+                </li>
+              </>
+            )}
+
+            {!user && (
+              <>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/login">Login</Link>
+                </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/register">Registrati</Link>
+                </li>
+              </>
             )}
           </ul>
-
-          <div className="d-flex align-items-center">
-            {user ? (
-              <>
-                <span className="text-white small me-2">
-                  Ciao, <b>{user.email}</b>
-                </span>
-                {user.role === "admin" && (
-                  <Link className="nav-link text-warning me-2" to="/admin">
-                    Admin
-                  </Link>
-                )}
-                <button
-                  className="btn btn-sm btn-outline-light"
-                  onClick={handleLogout}
-                >
-                  Logout
-                </button>
-              </>
-            ) : (
-              <>
-                <Link className="btn btn-outline-light btn-sm me-2" to="/login">
-                  Login
-                </Link>
-                <Link className="btn btn-warning btn-sm" to="/register">
-                  Registrati
-                </Link>
-              </>
-            )}
-          </div>
         </div>
       </div>
     </nav>
